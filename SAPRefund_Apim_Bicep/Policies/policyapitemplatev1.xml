@@ -1,0 +1,225 @@
+<!--
+    IMPORTANT:
+    - Policy elements can appear only within the <inbound>, <outbound>, <backend> section elements.
+    - To apply a policy to the incoming request (before it is forwarded to the backend service), place a corresponding policy element within the <inbound> section element.
+    - To apply a policy to the outgoing response (before it is sent back to the caller), place a corresponding policy element within the <outbound> section element.
+    - To add a policy, place the cursor at the desired insertion point and select a policy from the sidebar.
+    - To remove a policy, delete the corresponding policy statement from the policy document.
+    - Position the <base> element within a section element to inherit all policies from the corresponding section element in the enclosing scope.
+    - Remove the <base> element to prevent inheriting policies from the corresponding section element in the enclosing scope.
+    - Policies are applied in the order of their appearance, from the top down.
+    - Comments within policy elements are not supported and may disappear. Place your comments between policy elements or at a higher level scope.
+-->
+<policies>
+    <inbound>
+        <base />
+        <!-- IP Filter validation -->
+        <ip-filter action="allow">
+            <address>40.84.30.147</address>
+        </ip-filter>
+        <!-- check Basic Authentication (custom) -->
+        <check-header name="Authorization" failed-check-httpcode="401" failed-check-error-message="Not authorized" ignore-case="false">
+            <value>{{AuthorizationBase64}}</value>
+        </check-header>
+        <!-- check Content Type -->
+        <check-header name="Content-Type" failed-check-httpcode="415" failed-check-error-message="Incorrect header for content-type" ignore-case="true">
+            <value>application/json</value>
+            <value>application/xml</value>
+        </check-header>
+        <!-- check Accept Header -->
+        <check-header name="Accept" failed-check-httpcode="415" failed-check-error-message="Incorrect header for Accept" ignore-case="true">
+            <value>application/json</value>
+            <value>application/xml</value>
+        </check-header>
+        <!-- set Call Tracking Id -->
+        <set-header name="call-tracking-id" exists-action="skip">
+            <value>@{ 
+				var guidBinary = new byte[16];
+				Array.Copy(Guid.NewGuid().ToByteArray(), 0, guidBinary, 0, 10);
+				long time = DateTime.Now.Ticks;
+				byte[] bytes = new byte[6];
+				unchecked
+				{
+				       bytes[5] = (byte)(time >> 40);
+				       bytes[4] = (byte)(time >> 32);
+				       bytes[3] = (byte)(time >> 24);
+				       bytes[2] = (byte)(time >> 16);
+				       bytes[1] = (byte)(time >> 8);
+				       bytes[0] = (byte)(time);
+				}
+				Array.Copy(bytes, 0, guidBinary, 10, 6);
+				return new Guid(guidBinary).ToString();
+			}</value>
+        </set-header>
+        <!-- check call-tracking-id header validation -->
+        <choose>
+            <when condition="@( 
+                String.IsNullOrEmpty(context.Request.Headers.GetValueOrDefault("call-tracking-id"))
+                ) ">
+                <return-response>
+                    <set-status code="422" reason="Unprocessable Entity: Input value not available" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>{ "statusCode": 422, "message": "call-tracking-id header value is empty" }</set-body>
+                </return-response>
+            </when>
+        </choose>
+        <!-- check OC-Correlation-id header validation -->
+        <choose>
+            <when condition="@( 
+                String.IsNullOrEmpty(context.Request.Headers.GetValueOrDefault("Correlation-id"))
+                ) ">
+                <return-response>
+                    <set-status code="422" reason="Unprocessable Entity: Correlation-id header value is empty" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>{ "statusCode": 422, "message": "Correlation-id header value is empty" }</set-body>
+                </return-response>
+            </when>
+        </choose>
+        <!-- Validate Request Url and check for regular expression-->
+        <choose>
+            <when condition="@( 
+                   String.IsNullOrEmpty(context.Request.Url.QueryString.ToString())  
+                   || Regex.IsMatch(context.Request.Url.QueryString.ToString(), @"%3C!--#(include|exec|echo|config|printenv)\s+.*", RegexOptions.IgnoreCase)
+                   || Regex.IsMatch(context.Request.Url.QueryString.ToString(), @"[\s]*((delete)|(exec)|(drop%20\s*table)|(insert)|(shutdown)|(update)|(\bor\b))", RegexOptions.IgnoreCase) 
+                   || Regex.IsMatch(context.Request.Url.QueryString.ToString(), @"%3C\s*script\b[^%3E]*%3E[^%3C]+%3C\s*/\s*script\s*%3E", RegexOptions.IgnoreCase)
+                   || Regex.IsMatch(context.Request.Url.QueryString.ToString(), @"%3C\s*script|\s*script\s|script%3E", RegexOptions.IgnoreCase)
+                   || Regex.IsMatch(context.Request.Url.QueryString.ToString(), @".*?Exception%20in%20thread.*", RegexOptions.IgnoreCase)
+                   || Regex.IsMatch(context.Request.Url.QueryString.ToString(), @"(/(@?[\w_?\w:\*]+(\[[^]]+\])*)?)+", RegexOptions.IgnoreCase)
+                   || Regex.IsMatch(context.Request.Url.QueryString.ToString(), @"/?(ancestor(-or-self)?|descendant(-or-self)?|following(-sibling))", RegexOptions.IgnoreCase)
+                      
+                ) ">
+                <return-response>
+                    <set-status code="422" reason="Unprocessable Entity: POST has illegal input" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>{ "statusCode": 422, "message": "POST has illegal input." }</set-body>
+                </return-response>
+            </when>
+        </choose>
+        <!-- check request-body size  -->
+        <choose>
+            <when condition="@(context.Request.Body.As<string>(preserveContent: true).Length != null && (context.Request.Body.As<string>(preserveContent: true).Length<50))" />
+            <otherwise>
+                <return-response>
+                    <set-status code="413" reason="Request-size limit out of range" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>{ "statusCode": 413, "message": "Failed to POST as request body-size limit is not in range" }</set-body>
+                </return-response>
+            </otherwise>
+        </choose>
+        <!-- Set variable parameter for query string and query string length -->
+        <set-variable name="query_string" value="@(context.Request.Url.QueryString.ToString())" />
+        <set-variable name="query_string_length" value="@(context.Request.Url.QueryString.ToString().Length)" />
+        <choose>
+            <!-- Check size of query string -->
+            <when condition="@( 
+                String.IsNullOrEmpty(context.Variables.GetValueOrDefault<string>("query_string"))
+                || context.Variables.GetValueOrDefault<int>("query_string_length") > 0
+                || context.Variables.GetValueOrDefault<int>("query_string_length") < 500
+                ) " />
+            <otherwise>
+                <return-response>
+                    <set-status code="422" reason="GET input too large" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>{ "statusCode": 422, "message": "GET input too large." }</set-body>
+                </return-response>
+            </otherwise>
+        </choose>
+        <!-- check/increment rate limit -->
+        <rate-limit-by-key calls="200" renewal-period="60" counter-key="@(context.Subscription.Id)" increment-condition="@(context.Response.StatusCode == 200)" />
+        <!-- check/increment quota limit -->
+        <quota-by-key calls="5000" renewal-period="3600" counter-key="@(context.Subscription.Id)" increment-condition="@(context.Response.StatusCode >= 200 && context.Response.StatusCode < 400)" />
+        <!-- Set Backend URL -->
+        <set-backend-service base-url="{{BackendUrl}}" />
+        <authentication-basic username="{{BackendUserName}}" password="{{BackendPassword}}" />
+        <!-- rewrite Backend URL -->
+        <rewrite-uri template="@(context.Request.Url.Path.Replace("forward/", ""))" />
+        <!-- Extract Event Mesh Token using URL -->
+        <send-request ignore-error="false" timeout="60" response-variable-name="bearerToken" mode="new">
+            <set-url>{{EventMeshTokenGeneratorUrl}}</set-url>
+            <set-method>GET</set-method>
+            <set-header name="Content-Type" exists-action="override">
+                <value>application/x-www-form-urlencoded</value>
+            </set-header>
+            <set-header name="Authorization" exists-action="override">
+                <value>@("Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("{{ClientName}}:{{ClientSecret}}")))</value>
+            </set-header>
+            <set-body>@("username={{ClientName}}&password={{ClientSecret}}&grant_type=password")</set-body>
+        </send-request>
+        <set-variable name="token" value="@((String)((IResponse)context.Variables["bearerToken"]).Body.As<JObject>()["access_token"])" />
+        <!--Event Mesh call-->
+        <send-request mode="new" response-variable-name="stringRequestResult" timeout="240" ignore-error="true">
+            <set-url>{{EventMeshUrl}}</set-url>
+            <set-method>POST</set-method>
+            <set-header name="Authorization" exists-action="override">
+                <value>@{
+                return $"Bearer {(String)context.Variables["token"]}";
+            }</value>
+            </set-header>
+            <set-header name="x-qos" exists-action="override">
+                <value>0</value>
+            </set-header>
+            <set-header name="Content-Type" exists-action="override">
+                <value>application/json</value>
+            </set-header>
+            <set-body>@(context.Request.Body.As<string>())</set-body>
+        </send-request>
+    </inbound>
+    <backend>
+        <!-- Set backend timeout request and increase timeout to 240secs -->
+        <forward-request timeout="240" buffer-request-body="true" />
+    </backend>
+    <outbound>
+        <base />
+        <!-- Splunk API Call for logging payload data -->
+        <send-request mode="new" response-variable-name="stringRequestResult" timeout="240" ignore-error="true">
+            <set-url>{{SAPSplunkAPIProxyUrl}}</set-url>
+            <set-method>POST</set-method>
+            <set-header name="Authorization" exists-action="override">
+                <value>{{SplunkAuthorizationToken}}</value>
+            </set-header>
+            <set-header name="Content-Type" exists-action="override">
+                <value>application/json</value>
+            </set-header>
+            <set-body template="liquid">
+            {
+            "event": {
+                        "apiproxy.name": "shipment-update",
+                        "call-tracking-id": "test-123",
+                        "request.verb": "POST",
+                        "requestdata": {{context.Variables["body-content"]}}
+                    },
+                "host": "azure.apim.dev.logdiagnostics",
+                "source": "shipment-update",
+                "sourcetype": "azure:apim"
+            }
+            
+            </set-body>
+        </send-request>
+    </outbound>
+    <on-error>
+        <base />
+        <!-- define error handling policies -->
+        <set-header name="ErrorReason" exists-action="override">
+            <value>@(context.LastError.Reason)</value>
+        </set-header>
+        <set-header name="ErrorSection" exists-action="override">
+            <value>@(context.LastError.Section)</value>
+        </set-header>
+        <set-header name="ErrorPolicyId" exists-action="override">
+            <value>@(context.LastError.PolicyId)</value>
+        </set-header>
+        <set-header name="ErrorStatusCode" exists-action="override">
+            <value>@(context.Response.StatusCode.ToString())</value>
+        </set-header>
+    </on-error>
+</policies>

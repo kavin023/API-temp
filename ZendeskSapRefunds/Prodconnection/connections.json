@@ -1,0 +1,33 @@
+{
+  "serviceProviderConnections": {
+    "serviceBus": {
+      "parameterValues": {
+        "connectionString": ""
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      },
+      "displayName": "prodcon"
+    },
+    "sap": {
+      "parameterValues": {
+        "language": "EN",
+        "logonType": "ApplicationServer",
+        "authenticationType": "Basic",
+        "client": "300",
+        "userName": "AZU_HANA_P",
+        "password": "",
+        "applicationServerHost": "10.126.6.35",
+        "applicationServerSystemNumber": "00",
+        "applicationServerService": "sapgw00"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/sap"
+      },
+      "displayName": "sapprodcon"
+    }
+  },
+  "managedApiConnections": {}
+
+}

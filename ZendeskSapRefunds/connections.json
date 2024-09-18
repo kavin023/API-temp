@@ -1,0 +1,46 @@
+{
+  "serviceProviderConnections": {
+    "serviceBus": {
+      "parameterValues": {
+        "connectionString": ""
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      },
+      "displayName": "testcon"
+    },
+    "sap": {
+      "parameterValues": {
+        "language": "EN",
+        "logonType": "ApplicationServer",
+        "authenticationType": "Basic",
+        "client": "300",
+        "userName": "AZU_HANA_T",
+        "password": "",
+        "applicationServerHost": "10.126.6.31",
+        "applicationServerSystemNumber": "00",
+        "applicationServerService": "sapgw00"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/sap"
+      },
+      "displayName": "saptestcon"
+    }
+  },
+  "managedApiConnections": {},
+  "functionConnections": {
+    "azureFunctionOperation": {
+      "function": {
+        "id": "/subscriptions/92b92fd8-a9b1-41ef-aeb8-07ee8fa924b4/resourceGroups/rg-weu-sap-servicenow/providers/Microsoft.Web/sites/FnAppcsvtoJsonConvert/functions/powershellTrigger"
+      },
+      "triggerUrl": "https://fnappcsvtojsonconvert.azurewebsites.net/api/powershelltrigger",
+      "authentication": {
+        "type": "QueryString",
+        "name": "Code",
+        "value": "QqU07mlm5uUxIb2ptu6qO9leAf_D6aBc_f2xMhVxqfPUAzFu5oLmpQ=="
+      },
+      "displayName": "testcon"
+    }
+  }
+}

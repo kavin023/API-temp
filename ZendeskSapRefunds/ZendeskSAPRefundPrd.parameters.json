@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "value": "LA-weu-ZendeskSAPRefund"
+    },
+    "LogicAppLocation": {
+      "value": "westeurope"
+    },
+    "sftpwithssh_1_hostName": {
+      "value": "nlftp.tomtomgroup.com"
+    },
+    "sftpwithssh_1_portNumber": {
+      "value": 22
+    },
+    "sftpwithssh_1_userName": {
+      "value": "svc_biztalk_ftp"
+    },
+    "sftpwithssh_1_password": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/28908956-9c6b-47ee-84c3-4d9696cb8664/resourceGroups/RG-weu-keys-prod/providers/Microsoft.KeyVault/vaults/KV-weu-biztalk-prod"
+        },
+        "secretName": "nlftp-svcbiztalkftp"
+      }
+    },
+    "sftpwithssh_1_sshPrivateKey": {
+      "value": ""
+    },
+    "sftpwithssh_1_sshPrivateKeyPassphrase": {
+      "value": ""
+    },
+    "sftpwithssh_1_rootFolder": {
+      "value": "/Process/BizTalk/RightNow/FromRightNow"
+    },
+    "azurefile_1_accountName": {
+      "value": "ttweubtsprdfilesharefsw"
+    },
+    "azurefile_1_accessKey": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/28908956-9c6b-47ee-84c3-4d9696cb8664/resourceGroups/RG-weu-keys-prod/providers/Microsoft.KeyVault/vaults/KV-weu-biztalk-prod"
+        },
+        "secretName": "ttweubtsprdfilesharefsw-secret"
+      }
+    },
+    "folderpath": { "value": "/Process/BizTalk/RightNow/FromRightNow" },
+    "folderpathstorage": { "value": "/shared/Zendesk/SapRefund/Prod" }
+  }
+
+}

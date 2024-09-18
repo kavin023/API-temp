@@ -1,0 +1,74 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "Flat_File_Decoding": {
+        "type": "FlatFileDecoding",
+        "inputs": {
+          "content": "@triggerBody()?['contentData']",
+          "schema": {
+            "source": "LogicApp",
+            "name": "RN.xsd"
+          }
+        },
+        "runAfter": {}
+      },
+      "Transform_XML": {
+        "type": "Xslt",
+        "inputs": {
+          "content": "@body('Flat_File_Decoding')",
+          "map": {
+            "source": "LogicApp",
+            "name": "RightNow_Refund_FF_ToSAP.xslt"
+          }
+        },
+        "runAfter": {
+          "Flat_File_Decoding": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "[IDoc]_Send_document_to_SAP": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "idocFormat": "MicrosoftLobNamespaceXml",
+            "confirmTid": true,
+            "allowUnreleasedSegment": true,
+            "bizTalkXmlIDoc": "@body('Transform_XML')"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "sap",
+            "operationId": "sendIDoc",
+            "serviceProviderId": "/serviceProviders/sap"
+          }
+        },
+        "runAfter": {
+          "Transform_XML": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "triggers": {
+      "When_messages_are_available_in_a_queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-sap-zendesk",
+            "isSessionsEnabled": false
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "receiveQueueMessages",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    }
+  },
+  "kind": "Stateful"
+}
